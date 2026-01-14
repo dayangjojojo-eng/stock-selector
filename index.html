@@ -417,48 +417,32 @@
             refreshTimer = setInterval(loadRealTimeData, 60000);
         });
 
-        // ==================== API配置 ====================
-        const API_URL = 'https://stock-api-taupe.vercel.app/api/stocks';
-
         // ==================== 实时数据加载 ====================
+        const API_URL = 'https://stock-api-taupe.vercel.app/api/stocks';
+        
         async function loadRealTimeData() {
-            showMsg('overviewMsg', '🔄 正在加载数据...', 'info');
+            showMsg('overviewMsg', '🔄 正在获取数据...', 'info');
             
-            // 如果配置了API地址，尝试从后端获取实时数据
-            if (API_URL) {
-                try {
-                    const response = await fetch(API_URL);
-                    const result = await response.json();
-                    if (result.success && result.data && result.data.length > 0) {
-                        stocks = result.data.map(s => ({
-                            ...s,
-                            fullCode: s.fullCode || ((s.code.startsWith('6') ? 'sh' : 'sz') + s.code)
-                        }));
-                        isRealTimeData = result.source !== 'local';
-                        const sourceText = isRealTimeData ? '实时数据' : '本地数据';
-                        showMsg('overviewMsg', `✅ ${sourceText}加载完成 | 共 ${stocks.length} 只股票 | 更新时间: ${new Date().toLocaleTimeString()}`, 'success');
-                        updateUI();
-                        return;
-                    }
-                } catch (error) {
-                    console.log('API请求失败，使用本地数据:', error);
+            try {
+                const response = await fetch(API_URL);
+                const result = await response.json();
+                if (result.success && result.data && result.data.length > 0) {
+                    stocks = result.data.map(s => ({
+                        ...s,
+                        fullCode: s.fullCode || ((s.code.startsWith('6') ? 'sh' : 'sz') + s.code)
+                    }));
+                    isRealTimeData = true;
+                    showMsg('overviewMsg', '✅ 数据加载完成 | 共 ' + stocks.length + ' 只股票 | ' + new Date().toLocaleTimeString(), 'success');
+                    updateUI();
+                    return;
                 }
+            } catch (error) {
+                console.log('API请求失败:', error);
             }
             
-            // 使用本地数据
+            // API失败时使用本地数据
             loadLocalData();
-            
-            // 模拟实时价格波动（让数据看起来更真实）
-            stocks.forEach(s => {
-                // 随机波动 -2% 到 +2%
-                const fluctuation = (Math.random() - 0.5) * 0.04;
-                s.price = parseFloat((s.price * (1 + fluctuation)).toFixed(2));
-                s.change = parseFloat(((Math.random() - 0.5) * 6).toFixed(2));
-            });
-            
-            isRealTimeData = false;
-            const apiHint = API_URL ? '' : ' | 配置API_URL可获取实时数据';
-            showMsg('overviewMsg', '✅ 本地数据加载完成 | 共 ' + stocks.length + ' 只股票' + apiHint, 'success');
+            showMsg('overviewMsg', '⚠️ 使用本地数据 | 共 ' + stocks.length + ' 只股票', 'error');
             updateUI();
         }
         
