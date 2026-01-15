@@ -455,8 +455,18 @@
                 const result = await response.json();
                 if (result.success && result.data && result.data.length > 0) {
                     stocks = result.data.map(s => ({
-                        ...s,
+                        code: s.code,
                         name: STOCK_NAMES[s.code] || s.name || s.code,
+                        price: parseFloat(s.price) || 0,
+                        change: parseFloat(s.change) || 0,
+                        pe: parseFloat(s.pe) || 0,
+                        pb: parseFloat(s.pb) || 0,
+                        roe: parseFloat(s.roe) || 0,
+                        volume: parseFloat(s.volume) || 0,
+                        amount: parseFloat(s.amount) || 0,
+                        high: parseFloat(s.high) || 0,
+                        low: parseFloat(s.low) || 0,
+                        open: parseFloat(s.open) || 0,
                         fullCode: s.fullCode || ((s.code.startsWith('6') ? 'sh' : 'sz') + s.code),
                         industry: getIndustryByCode(s.code)
                     }));
