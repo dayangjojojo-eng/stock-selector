@@ -109,10 +109,19 @@
         <div class="main-layout">
             <!-- 侧边栏 -->
             <div class="sidebar">
+                <h2>🔍 搜索股票</h2>
+                <div class="filter-group">
+                    <label>输入股票代码搜索</label>
+                    <div class="range-inputs">
+                        <input type="text" id="searchCode" placeholder="如: 600519">
+                        <button class="btn-small" onclick="searchStock()" style="width:60px;">搜索</button>
+                    </div>
+                </div>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid #eee;">
                 <h2>🔍 筛选条件</h2>
                 <div class="filter-group">
-                    <label>股票代码</label>
-                    <input type="text" id="codeFilter" placeholder="如: 600000">
+                    <label>股票代码/名称</label>
+                    <input type="text" id="codeFilter" placeholder="在列表中筛选">
                 </div>
                 <div class="filter-group">
                     <label>价格范围 (¥)</label>
@@ -419,6 +428,7 @@
 
         // ==================== 实时数据加载 ====================
         const API_URL = 'https://stock-api-taupe.vercel.app/api/stocks';
+        const SEARCH_API = 'https://stock-api-taupe.vercel.app/api/search';
         
         async function loadRealTimeData() {
             showMsg('overviewMsg', '🔄 正在获取数据...', 'info');
@@ -444,6 +454,63 @@
             loadLocalData();
             showMsg('overviewMsg', '⚠️ 使用本地数据 | 共 ' + stocks.length + ' 只股票', 'error');
             updateUI();
+        }
+
+        // 搜索任意股票
+        async function searchStock() {
+            const code = document.getElementById('searchCode').value.trim();
+            if (!code) {
+                alert('请输入股票代码');
+                return;
+            }
+            
+            showMsg('overviewMsg', '🔍 正在搜索 ' + code + '...', 'info');
+            
+            try {
+                const response = await fetch(SEARCH_API + '?code=' + code);
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    const s = result.data;
+                    // 检查是否已存在
+                    const exists = stocks.find(stock => stock.code === code);
+                    if (!exists) {
+                        stocks.unshift({
+                            code: code,
+                            name: code,
+                            price: s.price,
+                            change: s.change,
+                            pe: s.pe,
+                            pb: s.pb,
+                            roe: 0,
+                            high: s.high,
+                            low: s.low,
+                            open: s.open,
+                            volume: s.volume,
+                            turnover: s.turnover,
+                            industry: 'other',
+                            fullCode: (code.startsWith('6') ? 'sh' : 'sz') + code
+                        });
+                    } else {
+                        // 更新已存在的数据
+                        Object.assign(exists, {
+                            price: s.price,
+                            change: s.change,
+                            pe: s.pe,
+                            pb: s.pb,
+                            high: s.high,
+                            low: s.low
+                        });
+                    }
+                    showMsg('overviewMsg', '✅ 找到股票 ' + code + ' | 现价: ¥' + s.price + ' | 涨跌: ' + s.change + '%', 'success');
+                    updateUI();
+                    document.getElementById('searchCode').value = '';
+                } else {
+                    showMsg('overviewMsg', '❌ 未找到股票 ' + code + '，请检查代码是否正确', 'error');
+                }
+            } catch (error) {
+                showMsg('overviewMsg', '❌ 搜索失败: ' + error.message, 'error');
+            }
         }
         
         // 更新UI
