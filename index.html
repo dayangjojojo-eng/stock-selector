@@ -184,7 +184,7 @@
             <!-- 主内容区 -->
             <div class="content">
                 <div class="tabs">
-                    <button class="tab-btn active" onclick="switchTab('overview')">📊 概览</button>
+                    <button class="tab-btn active" onclick="switchTab('overview')">� 热门股票</button>
                     <button class="tab-btn" onclick="switchTab('stocks')">📈 股票列表</button>
                     <button class="tab-btn" onclick="switchTab('technical')">📉 技术分析</button>
                     <button class="tab-btn" onclick="switchTab('indicators')">📐 技术指标</button>
@@ -196,7 +196,7 @@
 
                 <!-- 概览 -->
                 <div id="tab-overview" class="tab-content active">
-                    <h2>📊 市场概览</h2>
+                    <h2>� 热门股票</h2>
                     <div id="overviewMsg"></div>
                     <div class="stats-grid">
                         <div class="stat-card"><div class="stat-label">股票总数</div><div class="stat-value" id="statTotal">0</div></div>
@@ -429,6 +429,7 @@
         // ==================== 实时数据加载 ====================
         const API_URL = 'https://stock-api-taupe.vercel.app/api/stocks';
         const SEARCH_API = 'https://stock-api-taupe.vercel.app/api/search';
+        let currentIndustry = ''; // 当前选中的行业
         
         // 股票名称映射（解决API返回乱码问题）
         const STOCK_NAMES = {
@@ -444,14 +445,42 @@
             '600048':'保利发展','600011':'华能国际','601985':'中国核电','600585':'海螺水泥',
             '000423':'东阿阿胶','002460':'赣锋锂业','600219':'南山铝业','601100':'恒立液压',
             '000630':'铜陵有色','002466':'天齐锂业','600426':'华鲁恒升','601688':'华泰证券',
-            '601601':'中国太保','601328':'交通银行','000002':'万科A'
+            '601601':'中国太保','601328':'交通银行','000002':'万科A',
+            // 更多科技股
+            '300014':'亿纬锂能','002241':'歌尔股份','002049':'紫光国微','300124':'汇川技术',
+            '300033':'同花顺','002236':'大华股份','300136':'信维通信','002371':'北方华创',
+            '688981':'中芯国际','688012':'中微公司','688036':'传音控股','688111':'金山办公',
+            '688008':'澜起科技','688009':'中国通号','688126':'沪硅产业','688099':'晶晨股份',
+            // 更多金融股
+            '601818':'光大银行','601229':'上海银行','601998':'中信银行','600016':'民生银行',
+            '600015':'华夏银行','601169':'北京银行','601009':'南京银行','600919':'江苏银行',
+            '601288':'农业银行','601939':'建设银行','601658':'邮储银行','601838':'成都银行',
+            // 更多消费股
+            '600600':'青岛啤酒','000895':'双汇发展','002714':'牧原股份','000596':'古井贡酒',
+            '603369':'今世缘','600779':'水井坊','000869':'张裕A','600132':'重庆啤酒',
+            // 更多医药股
+            '300760':'迈瑞医疗','600436':'片仔癀','002007':'华兰生物','600867':'通化东宝',
+            '000963':'华东医药','603259':'药明康德','002422':'科伦药业','002252':'上海莱士',
+            '600085':'同仁堂','300003':'乐普医疗','002001':'新和成','600332':'白云山',
+            // 更多能源股
+            '600886':'国投电力','601991':'大唐发电','600025':'华能水电','600027':'华电国际',
+            '601016':'节能风电','600795':'国电电力','600023':'浙能电力','600021':'上海电力',
+            // 更多材料股
+            '601600':'中国铝业','600176':'中国巨石','600188':'兖矿能源','600989':'宝丰能源',
+            '601225':'陕西煤业','600497':'驰宏锌锗','600096':'云天化','600549':'厦门钨业',
+            // 更多工业股
+            '601186':'中国铁建','600104':'上汽集团','601766':'中国中车','601111':'中国国航',
+            '600009':'上海机场','600115':'东方航空','600118':'中国卫星','600125':'铁龙物流'
         };
         
-        async function loadRealTimeData() {
-            showMsg('overviewMsg', '🔄 正在获取数据...', 'info');
+        // 加载实时数据（支持行业参数）
+        async function loadRealTimeData(industry = '') {
+            const industryName = industry ? industryMap[industry] : '热门';
+            showMsg('overviewMsg', `🔄 正在获取${industryName}股票数据...`, 'info');
             
             try {
-                const response = await fetch(API_URL);
+                const url = industry ? `${API_URL}?industry=${industry}` : API_URL;
+                const response = await fetch(url);
                 const result = await response.json();
                 if (result.success && result.data && result.data.length > 0) {
                     stocks = result.data.map(s => ({
@@ -468,10 +497,14 @@
                         low: parseFloat(s.low) || 0,
                         open: parseFloat(s.open) || 0,
                         fullCode: s.fullCode || ((s.code.startsWith('6') ? 'sh' : 'sz') + s.code),
-                        industry: getIndustryByCode(s.code)
+                        industry: s.industry || getIndustryByCode(s.code)
                     }));
+                    currentIndustry = industry;
                     isRealTimeData = true;
-                    showMsg('overviewMsg', '✅ 实时数据 | 共 ' + stocks.length + ' 只股票 | ' + new Date().toLocaleTimeString(), 'success');
+                    const msg = industry 
+                        ? `✅ ${industryName}行业 | 共 ${stocks.length} 只股票 | ${new Date().toLocaleTimeString()}`
+                        : `✅ 实时数据 | 共 ${stocks.length} 只股票 | ${new Date().toLocaleTimeString()}`;
+                    showMsg('overviewMsg', msg, 'success');
                     updateUI();
                     return;
                 }
@@ -487,15 +520,32 @@
         
         function getIndustryByCode(code) {
             const ind = {
+                // 金融
                 '600036':'finance','601318':'finance','600000':'finance','601398':'finance','601988':'finance',
                 '601166':'finance','000001':'finance','600030':'finance','601688':'finance','601601':'finance','601328':'finance',
+                '601818':'finance','601229':'finance','601998':'finance','600016':'finance','600015':'finance',
+                '601169':'finance','601009':'finance','600919':'finance','601288':'finance','601939':'finance',
+                // 消费
                 '600519':'consumer','000858':'consumer','000333':'consumer','000651':'consumer','600887':'consumer',
-                '000568':'consumer','002304':'consumer','603288':'consumer','600809':'consumer',
+                '000568':'consumer','002304':'consumer','603288':'consumer','600809':'consumer','600600':'consumer',
+                '000895':'consumer','002714':'consumer','000596':'consumer','603369':'consumer','600779':'consumer',
+                // 科技
                 '300750':'tech','002594':'tech','002415':'tech','000725':'tech','300059':'tech','002230':'tech','002475':'tech','000063':'tech',
-                '600276':'healthcare','000538':'healthcare','600196':'healthcare',
-                '600900':'energy','601012':'energy','600011':'energy','601985':'energy',
-                '600309':'material','601899':'material','600585':'material','000423':'material','002460':'material','002466':'material','000630':'material','600219':'material','600426':'material',
-                '600031':'industrial','601668':'industrial','601390':'industrial','600048':'industrial','002352':'industrial','601100':'industrial','000002':'industrial'
+                '300014':'tech','002241':'tech','002049':'tech','300124':'tech','300033':'tech','002236':'tech',
+                '688981':'tech','688012':'tech','688036':'tech','688111':'tech','688008':'tech',
+                // 医药
+                '600276':'healthcare','000538':'healthcare','600196':'healthcare','300760':'healthcare','600436':'healthcare',
+                '002007':'healthcare','600867':'healthcare','000963':'healthcare','603259':'healthcare','002422':'healthcare',
+                // 能源
+                '600900':'energy','601012':'energy','600011':'energy','601985':'energy','600886':'energy',
+                '601991':'energy','600025':'energy','600027':'energy','601016':'energy','600795':'energy',
+                // 材料
+                '600309':'material','601899':'material','600585':'material','000423':'material','002460':'material',
+                '002466':'material','000630':'material','600219':'material','600426':'material','601600':'material',
+                '600176':'material','600188':'material','600989':'material','601225':'material',
+                // 工业
+                '600031':'industrial','601668':'industrial','601390':'industrial','600048':'industrial','002352':'industrial',
+                '601100':'industrial','000002':'industrial','601186':'industrial','600104':'industrial','601766':'industrial'
             };
             return ind[code] || 'other';
         }
@@ -579,10 +629,26 @@
             document.getElementById('filterBtn').addEventListener('click', applyFilters);
             document.getElementById('resetBtn').addEventListener('click', resetFilters);
             document.getElementById('refreshBtn').addEventListener('click', refreshData);
+            // 行业选择变化时自动加载该行业数据
+            document.getElementById('industryFilter').addEventListener('change', onIndustryChange);
+        }
+        
+        // 行业选择变化时从API加载该行业的更多股票
+        async function onIndustryChange() {
+            const industry = document.getElementById('industryFilter').value;
+            if (industry && industry !== currentIndustry) {
+                // 从API加载该行业的股票
+                await loadRealTimeData(industry);
+                // 自动切换到股票列表
+                switchTab('stocks');
+            } else if (!industry && currentIndustry) {
+                // 选择"全部行业"时，重新加载热门股票
+                await loadRealTimeData('');
+            }
         }
 
         // ==================== 筛选功能 ====================
-        function applyFilters() {
+        async function applyFilters() {
             const code = document.getElementById('codeFilter').value.toLowerCase();
             const priceMin = parseFloat(document.getElementById('priceMin').value) || 0;
             const priceMax = parseFloat(document.getElementById('priceMax').value) || Infinity;
@@ -595,6 +661,13 @@
             const roeMin = parseFloat(document.getElementById('roeMin').value) || -Infinity;
             const roeMax = parseFloat(document.getElementById('roeMax').value) || Infinity;
             const industry = document.getElementById('industryFilter').value;
+            
+            // 如果选择了行业且与当前不同，先从API加载该行业数据
+            if (industry && industry !== currentIndustry) {
+                await loadRealTimeData(industry);
+            } else if (!industry && currentIndustry) {
+                await loadRealTimeData('');
+            }
 
             filteredStocks = stocks.filter(s => {
                 return (s.code.includes(code) || s.name.toLowerCase().includes(code)) &&
@@ -610,16 +683,21 @@
             updateStats();
         }
 
-        function resetFilters() {
+        async function resetFilters() {
             ['codeFilter', 'priceMin', 'priceMax', 'changeMin', 'changeMax', 'peMin', 'peMax', 'pbMin', 'pbMax', 'roeMin', 'roeMax'].forEach(id => document.getElementById(id).value = '');
             document.getElementById('industryFilter').value = '';
-            filteredStocks = [...stocks];
-            renderStocks();
-            updateStats();
+            // 如果当前是行业筛选状态，重新加载热门股票
+            if (currentIndustry) {
+                await loadRealTimeData('');
+            } else {
+                filteredStocks = [...stocks];
+                renderStocks();
+                updateStats();
+            }
         }
 
         function refreshData() {
-            loadRealTimeData();
+            loadRealTimeData(currentIndustry);
         }
 
         // ==================== 渲染股票表格 ====================
@@ -629,19 +707,24 @@
             document.getElementById('stockCount').textContent = `(共 ${filteredStocks.length} 只)`;
 
             filteredStocks.forEach(s => {
-                const changeClass = s.change > 0 ? 'up' : s.change < 0 ? 'down' : '';
-                const changeSign = s.change > 0 ? '+' : '';
+                const change = parseFloat(s.change) || 0;
+                const price = parseFloat(s.price) || 0;
+                const pe = parseFloat(s.pe) || 0;
+                const pb = parseFloat(s.pb) || 0;
+                const roe = parseFloat(s.roe) || 0;
+                const changeClass = change > 0 ? 'up' : change < 0 ? 'down' : '';
+                const changeSign = change > 0 ? '+' : '';
                 const isFav = favorites.includes(s.code);
                 tbody.innerHTML += `
                     <tr>
                         <td class="code">${s.code}</td>
                         <td>${s.name}</td>
-                        <td>¥${s.price.toFixed(2)}</td>
-                        <td class="change ${changeClass}">${changeSign}${s.change.toFixed(2)}%</td>
-                        <td>${s.pe.toFixed(1)}</td>
-                        <td>${s.pb.toFixed(2)}</td>
-                        <td>${s.roe.toFixed(1)}%</td>
-                        <td>${industryMap[s.industry]}</td>
+                        <td>¥${price.toFixed(2)}</td>
+                        <td class="change ${changeClass}">${changeSign}${change.toFixed(2)}%</td>
+                        <td>${pe.toFixed(1)}</td>
+                        <td>${pb.toFixed(2)}</td>
+                        <td>${roe.toFixed(1)}%</td>
+                        <td>${industryMap[s.industry] || '其他'}</td>
                         <td>
                             <button class="btn-small" onclick="toggleFavorite('${s.code}')" style="background:${isFav ? '#f39c12' : '#667eea'}">${isFav ? '⭐' : '☆'}</button>
                             <button class="btn-small" onclick="showTechnical('${s.code}')">📉</button>
@@ -660,12 +743,12 @@
                 return;
             }
             document.getElementById('statTotal').textContent = data.length;
-            document.getElementById('statAvgPrice').textContent = '¥' + (data.reduce((sum, s) => sum + s.price, 0) / data.length).toFixed(2);
-            const avgChange = data.reduce((sum, s) => sum + s.change, 0) / data.length;
+            document.getElementById('statAvgPrice').textContent = '¥' + (data.reduce((sum, s) => sum + parseFloat(s.price) || 0, 0) / data.length).toFixed(2);
+            const avgChange = data.reduce((sum, s) => sum + (parseFloat(s.change) || 0), 0) / data.length;
             document.getElementById('statAvgChange').textContent = (avgChange >= 0 ? '+' : '') + avgChange.toFixed(2) + '%';
-            document.getElementById('statUp').textContent = data.filter(s => s.change > 0).length;
-            document.getElementById('statDown').textContent = data.filter(s => s.change < 0).length;
-            document.getElementById('statAvgPe').textContent = (data.reduce((sum, s) => sum + s.pe, 0) / data.length).toFixed(1);
+            document.getElementById('statUp').textContent = data.filter(s => parseFloat(s.change) > 0).length;
+            document.getElementById('statDown').textContent = data.filter(s => parseFloat(s.change) < 0).length;
+            document.getElementById('statAvgPe').textContent = (data.reduce((sum, s) => sum + (parseFloat(s.pe) || 0), 0) / data.length).toFixed(1);
         }
 
         // ==================== 行业分布图 ====================
@@ -675,15 +758,37 @@
             
             const chart = echarts.init(document.getElementById('industryChart'));
             chart.setOption({
-                title: { text: '行业分布', left: 'center' },
-                tooltip: { trigger: 'item' },
+                title: { text: '行业分布（点击加载更多该行业股票）', left: 'center' },
+                tooltip: { trigger: 'item', formatter: '{b}: {c}只 ({d}%)' },
                 series: [{
                     type: 'pie',
                     radius: ['40%', '70%'],
-                    data: Object.entries(industryStats).map(([k, v]) => ({ name: industryMap[k], value: v })),
+                    data: Object.entries(industryStats).map(([k, v]) => ({ name: industryMap[k] || '其他', value: v, industry: k })),
                     emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
                 }]
             });
+            
+            // 点击饼图从API加载该行业更多股票
+            chart.on('click', async function(params) {
+                const industry = params.data.industry;
+                const industryName = params.data.name;
+                if (industry && industry !== 'other') {
+                    // 更新下拉框选中状态
+                    document.getElementById('industryFilter').value = industry;
+                    // 从API加载该行业的更多股票
+                    await loadRealTimeData(industry);
+                    // 切换到股票列表标签
+                    switchTab('stocks');
+                } else {
+                    // 其他行业只在本地筛选
+                    filteredStocks = stocks.filter(s => s.industry === industry);
+                    renderStocks();
+                    updateStats();
+                    switchTab('stocks');
+                    showMsg('overviewMsg', `📊 已筛选 ${industryName} 行业，共 ${filteredStocks.length} 只股票`, 'success');
+                }
+            });
+            
             window.addEventListener('resize', () => chart.resize());
         }
 
